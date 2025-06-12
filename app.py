@@ -47,6 +47,9 @@ if uploaded_file is not None:
             else:
                 status = "Normal (Simetris)"
 
+            # Buat mode dalam string
+            mode_str = f"{modus:.2f}" if modus is not None else "-"
+
             # Histogram volume & normal curve (scaled to match bar heights)
             counts, bins = np.histogram(data, bins=[0.5,1.5,2.5,3.5])
             bin_centers = [1, 2, 3]
@@ -63,8 +66,8 @@ if uploaded_file is not None:
 
             ax.axvline(mean, color='blue', linestyle='--', label=f'Mean={mean:.2f}')
             ax.axvline(median, color='orange', linestyle=':', label=f'Median={median:.2f}')
-            if modus:
-                ax.axvline(modus, color='green', linestyle='-.', label=f'Mode={modus:.2f}')
+            if modus is not None:
+                ax.axvline(modus, color='green', linestyle='-.', label=f'Mode={mode_str}')
 
             ax.set_xticks([1,2,3])
             ax.set_xticklabels(['Cukup','Baik','Sangat Baik'], fontsize=12)
@@ -79,7 +82,7 @@ if uploaded_file is not None:
                 **Analisis Distribusi (Skewness):**
                 - **Mean**: {mean:.2f}
                 - **Median**: {median:.2f}
-                - **Mode**: {modus:.2f if modus else "-"}
+                - **Mode**: {mode_str}
                 - **Skewness**: {skewness:.2f} → **{status}**
             """)
     else:
