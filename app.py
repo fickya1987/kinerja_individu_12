@@ -1,69 +1,57 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import norm
 import seaborn as sns
 
-# Setting style for a visually appealing plot
-sns.set(style="whitegrid", palette="pastel", font_scale=1.2)
-
-st.set_page_config(page_title="Distribusi Normal KPI SDM Pelindo", layout="wide")
+st.set_page_config(page_title="Kurva Distribusi Normal Performa SDM", layout="wide")
 
 st.title("Kurva Distribusi Normal Kategori Performa SDM Pelindo")
 
-# Load data
 uploaded_file = st.file_uploader("Upload file KPI SDM (CSV)", type=["csv"])
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
-    
-    # Standardize column names
     df.columns = [c.strip() for c in df.columns]
+    st.write("Kolom pada data:", df.columns.tolist())
 
-    # Pilih kolom yang relevan
-    # Misal: 'Group', 'Kategori Performa' (namanya sesuaikan dengan file Anda)
-    # Tampilkan nama kolom untuk memastikan
-    st.write("Kolom yang tersedia:", df.columns.tolist())
-
-    # Mapping kategori ke urutan X-Axis
-    kategori_order = ['Cukup', 'Baik', 'Sangat Baik']
-
-    # Pastikan kolom sesuai, silakan ubah jika nama kolom berbeda!
-    group_col = 'Group'  # Ganti jika nama di file berbeda
-    kategori_col = 'Kategori Performa'  # Ganti jika nama di file berbeda
+    # Mapping kategori ke skor numerik
+    kategori_map = {'Cukup': 1, 'Baik': 2, 'Sangat Baik': 3}
+    group_col = 'Group'  # Ganti sesuai nama kolom di file
+    kategori_col = 'Kategori Performa'  # Ganti sesuai nama kolom di file
 
     if group_col in df.columns and kategori_col in df.columns:
-        # Hitung jumlah pegawai per group per kategori
-        group_counts = df.groupby([group_col, kategori_col]).size().reset_index(name='Jumlah Pegawai')
-
-        # Pivot agar mudah plot per group
-        pivot_df = group_counts.pivot(index=kategori_col, columns=group_col, values='Jumlah Pegawai').fillna(0)
-        pivot_df = pivot_df.reindex(kategori_order)
-
-        st.subheader("Visualisasi Kurva Distribusi Normal per Group")
+        df['Skor_Performa'] = df[kategori_col].map(kategori_map)
 
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # Color palette
-        colors = sns.color_palette("husl", len(pivot_df.columns))
+        colors = sns.color_palette("husl", n_colors=df[group_col].nunique())
 
-        for i, group in enumerate(pivot_df.columns):
-            # Interpolasi supaya kurva lebih smooth
-            y = pivot_df[group].values
-            x = range(len(kategori_order))
-            # Smoothing, simple approach (bisa diganti dengan spline untuk lebih halus)
-            sns.lineplot(x=x, y=y, marker='o', label=group, ax=ax, color=colors[i], linewidth=3)
-            for (xi, yi) in zip(x, y):
-                ax.text(xi, yi+0.5, int(yi), ha='center', va='bottom', fontsize=11, color=colors[i])
+        for idx, (group, subdf) in enumerate(df.groupby(group_col)):
+            data = subdf['Skor_Performa'].dropna()
+            if len(data) < 2:
+                continue
+            mu, std = norm.fit(data)
+            # Plot histogram
+            sns.histplot(data, bins=[0.5,1.5,2.5,3.5], stat='density', kde=False, color=colors[idx], 
+                         alpha=0.2, label=f"{group} (hist)", ax=ax)
+            # Plot PDF (normal curve)
+            x = np.linspace(1, 3, 100)
+            p = norm.pdf(x, mu, std)
+            ax.plot(x, p, '-', label=f"{group} (Normal Fit)", linewidth=3, color=colors[idx])
+            # Mark mean
+            ax.axvline(mu, linestyle='--', color=colors[idx], alpha=0.7)
+            ax.text(mu, max(p)*0.8, f"μ={mu:.2f}\nσ={std:.2f}", color=colors[idx], fontsize=11, ha='center')
 
-        ax.set_xticks(range(len(kategori_order)))
-        ax.set_xticklabels(kategori_order, fontsize=14)
-        ax.set_ylabel("Jumlah Pegawai", fontsize=13)
-        ax.set_xlabel("Kategori Performa", fontsize=13)
-        ax.set_title("Kurva Distribusi Normal Pegawai per Group", fontsize=17, fontweight='bold')
-        ax.legend(title="Group", fontsize=12)
-        ax.grid(axis='y', alpha=0.3)
-        plt.tight_layout()
+        ax.set_xticks([1,2,3])
+        ax.set_xticklabels(['Cukup','Baik','Sangat Baik'], fontsize=13)
+        ax.set_xlabel("Kategori Performa", fontsize=14)
+        ax.set_ylabel("Density", fontsize=14)
+        ax.set_title("Kurva Distribusi Normal (Bell Curve) per Group", fontsize=18, fontweight='bold')
+        ax.legend(fontsize=12)
         st.pyplot(fig)
     else:
-        st.warning("Nama kolom tidak ditemukan. Pastikan file memiliki kolom 'Group' dan 'Kategori Performa'.")
+        st.warning("Kolom 'Group' dan/atau 'Kategori Performa' tidak ditemukan.")
 else:
-    st.info("Silakan upload file CSV untuk memulai.")
+    st.info("Silakan upload file CSV terlebih dahulu.")
+
